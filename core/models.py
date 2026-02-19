@@ -3,6 +3,33 @@
 from django.db import models
 
 
+class Rol(models.Model):
+    descripcion = models.CharField(max_length=50)
+
+    def __str__(self):
+        return self.descripcion
+
+    class Meta:
+        verbose_name = "Rol"
+        verbose_name_plural = "Roles"
+
+
+class Usuario(models.Model):
+    idRol = models.ForeignKey(Rol, on_delete=models.PROTECT, related_name='usuarios', verbose_name="Rol")
+    usuario = models.CharField(max_length=50, unique=True)
+    contrasena = models.CharField(max_length=255, verbose_name="Contraseña")
+    correo = models.EmailField(unique=True)
+    nombre = models.CharField(max_length=100)
+    apellido = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.nombre} {self.apellido} ({self.usuario})"
+
+    class Meta:
+        verbose_name = "Usuario"
+        verbose_name_plural = "Usuarios"
+
+
 class Estado(models.Model):
     descripcion = models.CharField(max_length=50)
 
@@ -15,6 +42,7 @@ class Estado(models.Model):
 
 
 class Mesa(models.Model):
+    idUsuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='mesas', verbose_name="Usuario")
     estado = models.ForeignKey(Estado, on_delete=models.PROTECT, related_name='mesas')
     numMesa = models.IntegerField(unique=True, verbose_name="Número de Mesa")
     capacidad = models.IntegerField()
@@ -29,6 +57,7 @@ class Mesa(models.Model):
 
 
 class Plato(models.Model):
+    idUsuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='platos', verbose_name="Usuario")
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
     precio = models.DecimalField(max_digits=10, decimal_places=2)
@@ -72,3 +101,18 @@ class MenuPlato(models.Model):
     class Meta:
         verbose_name = "Menú Plato"
         verbose_name_plural = "Menú Platos"
+
+
+class Pedido(models.Model):
+    idUsuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='pedidos', verbose_name="Usuario")
+    idMesa = models.ForeignKey(Mesa, on_delete=models.PROTECT, related_name='pedidos', verbose_name="Mesa")
+    idEstado = models.ForeignKey(Estado, on_delete=models.PROTECT, related_name='pedidos', verbose_name="Estado")
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Pedido #{self.pk} - Mesa {self.idMesa.numMesa}"
+
+    class Meta:
+        verbose_name = "Pedido"
+        verbose_name_plural = "Pedidos"
+        ordering = ['-fecha']
