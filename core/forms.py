@@ -28,7 +28,11 @@ class MesaForm(forms.ModelForm):
             idRol__descripcion__iexact='Mesero'
         )
         # Solo los 3 primeros estados
-        self.fields['estado'].queryset = Estado.objects.all()[:3]
+        #self.fields['estado'].queryset = Estado.objects.all()
+        
+        self.fields['estado'].queryset = Estado.objects.filter(
+        descripcion__in=['Disponible', 'Reservada', 'Ocupada']
+    )
 
 class PlatoForm(forms.ModelForm):
     class Meta:
