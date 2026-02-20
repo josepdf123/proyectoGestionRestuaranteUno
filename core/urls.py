@@ -18,4 +18,11 @@ urlpatterns = [
     path('menus/', views.menus_lista, name='menus_lista'),
     path('menus/eliminar/<int:pk>/', views.menu_eliminar, name='menu_eliminar'),
     path('menus/editar/<int:pk>/', views.menu_editar, name='menu_editar'),
+    
+    
+    # Usuarios
+    path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
+    path('usuarios/eliminar/<int:pk>/', views.usuario_eliminar, name='usuario_eliminar'),
+    path('usuarios/editar/<int:pk>/', views.usuario_editar, name='usuario_editar'),
+    
 ]

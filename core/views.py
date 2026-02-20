@@ -2,11 +2,8 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import Mesa, Plato, Menu, MenuPlato, Estado
-from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm
-
-
-# ─── MESAS ────────────────────────────────────────────────────────────────────
+from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
+from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol# ─── MESAS ────────────────────────────────────────────────────────────────────
 
 def mesas_lista(request):
     mesas = Mesa.objects.select_related('estado').all()
@@ -158,3 +155,42 @@ def menu_editar(request, pk):
         'platos': platos,
         'platos_actuales': list(platos_actuales),
     })
+    
+    
+    # ─── USUARIOS ─────────────────────────────────────────────────────────────────
+
+def usuarios_lista(request):
+    usuarios = Usuario.objects.select_related('idRol').all()
+    form = UsuarioForm()
+
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '¡Usuario agregado correctamente!')
+            return redirect('usuarios_lista')
+        else:
+            messages.error(request, 'Error al agregar el usuario.')
+
+    return render(request, 'core/usuarios.html', {'usuarios': usuarios, 'form': form})
+
+
+def usuario_eliminar(request, pk):
+    usuario = get_object_or_404(Usuario, pk=pk)
+    if request.method == 'POST':
+        usuario.delete()
+        messages.success(request, f'Usuario "{usuario.usuario}" eliminado.')
+    return redirect('usuarios_lista')
+
+
+def usuario_editar(request, pk):
+    usuario = get_object_or_404(Usuario, pk=pk)
+    if request.method == 'POST':
+        form = UsuarioForm(request.POST, instance=usuario)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Usuario "{usuario.usuario}" actualizado.')
+            return redirect('usuarios_lista')
+    else:
+        form = UsuarioForm(instance=usuario)
+    return render(request, 'core/usuario_editar.html', {'form': form, 'usuario': usuario})
