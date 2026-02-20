@@ -116,3 +116,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+
+# Configuración de correo (usando Gmail)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'recovpass000@gmail.com'      #  correo Gmail
+EMAIL_HOST_PASSWORD = 'qlgf jmgx cmvh vjax'   # Contraseña de aplicación Gmail - no contraseña normal
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

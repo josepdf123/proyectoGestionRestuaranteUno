@@ -1,9 +1,13 @@
-# core/urls.py
-
 from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Auth
+    path('', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+    path('recuperar-contrasena/', views.recuperar_contrasena, name='recuperar_contrasena'),
+    path('reset-password/<str:token>/', views.reset_password, name='reset_password'),
+
     # Mesas
     path('mesas/', views.mesas_lista, name='mesas_lista'),
     path('mesas/eliminar/<int:pk>/', views.mesa_eliminar, name='mesa_eliminar'),
@@ -18,11 +22,9 @@ urlpatterns = [
     path('menus/', views.menus_lista, name='menus_lista'),
     path('menus/eliminar/<int:pk>/', views.menu_eliminar, name='menu_eliminar'),
     path('menus/editar/<int:pk>/', views.menu_editar, name='menu_editar'),
-    
-    
+
     # Usuarios
     path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
     path('usuarios/eliminar/<int:pk>/', views.usuario_eliminar, name='usuario_eliminar'),
     path('usuarios/editar/<int:pk>/', views.usuario_editar, name='usuario_editar'),
-    
 ]

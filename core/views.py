@@ -1,4 +1,8 @@
 # core/views.py
+import uuid
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -194,3 +198,74 @@ def usuario_editar(request, pk):
     else:
         form = UsuarioForm(instance=usuario)
     return render(request, 'core/usuario_editar.html', {'form': form, 'usuario': usuario})
+
+
+# ─── AUTH ─────────────────────────────────────────────────────────────────────
+
+def login_view(request):
+    if request.method == 'POST':
+        usuario_input = request.POST.get('usuario')
+        contrasena_input = request.POST.get('contrasena')
+
+        try:
+            usuario = Usuario.objects.get(usuario=usuario_input, contrasena=contrasena_input)
+            request.session['usuario_id'] = usuario.pk
+            request.session['usuario_nombre'] = usuario.nombre
+            request.session['usuario_rol'] = usuario.idRol.descripcion
+            messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
+            return redirect('mesas_lista')
+        except Usuario.DoesNotExist:
+            messages.error(request, 'Usuario o contraseña incorrectos.')
+
+    return render(request, 'core/login.html')
+
+
+def logout_view(request):
+    request.session.flush()
+    messages.success(request, 'Sesión cerrada correctamente.')
+    return redirect('login')
+
+
+def recuperar_contrasena(request):
+    if request.method == 'POST':
+        correo = request.POST.get('correo')
+        try:
+            usuario = Usuario.objects.get(correo=correo)
+            token = str(uuid.uuid4())
+            usuario.token_recuperacion = token
+            usuario.save()
+
+            enlace = request.build_absolute_uri(f'/reset-password/{token}/')
+            send_mail(
+                subject='Recuperación de contraseña - Restaurante',
+                message=f'Hola {usuario.nombre},\n\nHaz clic en el siguiente enlace para restablecer tu contraseña:\n{enlace}\n\nSi no solicitaste esto, ignora este correo.',
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[correo],
+            )
+            messages.success(request, 'Te enviamos un correo con el enlace de recuperación.')
+        except Usuario.DoesNotExist:
+            messages.error(request, 'No existe una cuenta con ese correo.')
+
+    return render(request, 'core/recuperar_contrasena.html')
+
+
+def reset_password(request, token):
+    try:
+        usuario = Usuario.objects.get(token_recuperacion=token)
+    except Usuario.DoesNotExist:
+        messages.error(request, 'El enlace no es válido o ya fue usado.')
+        return redirect('login')
+
+    if request.method == 'POST':
+        nueva = request.POST.get('contrasena')
+        confirmar = request.POST.get('confirmar')
+        if nueva == confirmar:
+            usuario.contrasena = nueva
+            usuario.token_recuperacion = None
+            usuario.save()
+            messages.success(request, '¡Contraseña actualizada! Ya puedes iniciar sesión.')
+            return redirect('login')
+        else:
+            messages.error(request, 'Las contraseñas no coinciden.')
+
+    return render(request, 'core/reset_password.html', {'token': token})
