@@ -7,9 +7,6 @@ from django.contrib import messages
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
 from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido
 
-
-# ─── DECORADOR DE SEGURIDAD ───────────────────────────────────────────────────
-
 # ─── DECORADORES DE SEGURIDAD ─────────────────────────────────────────────────
 
 def login_requerido(view_func):
@@ -30,7 +27,7 @@ def rol_requerido(*roles_permitidos):
                 return redirect('login')
             rol_actual = request.session.get('usuario_rol', '')
             if rol_actual not in roles_permitidos:
-                messages.error(request, f'No tienes permiso para acceder a esta sección.')
+                messages.error(request, 'No tienes permiso para acceder a esta sección.')
                 return redirect('acceso_denegado')
             return view_func(request, *args, **kwargs)
         wrapper.__name__ = view_func.__name__
@@ -39,6 +36,7 @@ def rol_requerido(*roles_permitidos):
 
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
+
 def login_view(request):
     if request.session.get('usuario_id'):
         rol = request.session.get('usuario_rol', '')
@@ -70,6 +68,7 @@ def login_view(request):
             messages.error(request, 'Usuario o contraseña incorrectos.')
 
     return render(request, 'core/login.html')
+
 
 def logout_view(request):
     request.session.flush()
@@ -116,8 +115,11 @@ def reset_password(request, token):
         else:
             messages.error(request, 'Las contraseñas no coinciden.')
     return render(request, 'core/reset_password.html', {'token': token})
+
+
 def acceso_denegado(request):
     return render(request, 'core/acceso_denegado.html')
+
 
 # ─── MESAS ────────────────────────────────────────────────────────────────────
 
@@ -302,10 +304,14 @@ def usuario_editar(request, pk):
 # ─── PANEL MESERO ─────────────────────────────────────────────────────────────
 
 @rol_requerido('Administrador', 'Mesero')
-
 def panel_mesero(request):
     mesas = Mesa.objects.select_related('estado').all()
-    return render(request, 'core/mesero/panel.html', {'mesas': mesas})
+    estado_listo = Estado.objects.filter(descripcion__iexact='listo').first()
+    pedidos_listos = Pedido.objects.filter(idEstado=estado_listo).select_related('idMesa') if estado_listo else []
+    return render(request, 'core/mesero/panel.html', {
+        'mesas': mesas,
+        'pedidos_listos': pedidos_listos,
+    })
 
 
 @rol_requerido('Administrador', 'Mesero')
@@ -314,11 +320,12 @@ def mesa_pedido(request, pk):
     platos = Plato.objects.all()
     estados = Estado.objects.all()
 
-    # Buscar pedido activo: estado cuya descripción sea 'pendiente' o 'en cocina'
     pedido_activo = mesa.pedidos.filter(
         idEstado__descripcion__iexact='pendiente'
     ).first() or mesa.pedidos.filter(
         idEstado__descripcion__iexact='en cocina'
+    ).first() or mesa.pedidos.filter(
+        idEstado__descripcion__iexact='listo'
     ).first()
 
     if request.method == 'POST':
@@ -381,6 +388,19 @@ def mesa_pedido(request, pk):
                 messages.success(request, f'¡Pedido de Mesa {mesa.numMesa} enviado a cocina!')
             return redirect('panel_mesero')
 
+        elif action == 'entregar_pedido':
+            if pedido_activo:
+                estado_entregado = Estado.objects.filter(descripcion__iexact='entregado').first()
+                if estado_entregado:
+                    pedido_activo.idEstado = estado_entregado
+                    pedido_activo.save()
+                estado_disponible = Estado.objects.filter(descripcion__iexact='disponible').first()
+                if estado_disponible:
+                    mesa.estado = estado_disponible
+                    mesa.save()
+                messages.success(request, f'¡Pedido de Mesa {mesa.numMesa} entregado! Mesa liberada.')
+            return redirect('panel_mesero')
+
     return render(request, 'core/mesero/mesa_pedido.html', {
         'mesa': mesa,
         'platos': platos,
@@ -399,11 +419,11 @@ def panel_cocina(request):
     if request.method == 'POST':
         pedido_id = request.POST.get('pedido_id')
         pedido = get_object_or_404(Pedido, pk=pedido_id)
-        estado_entregado = Estado.objects.filter(descripcion__iexact='entregado').first()
-        if estado_entregado:
-            pedido.idEstado = estado_entregado
+        estado_listo = Estado.objects.filter(descripcion__iexact='listo').first()
+        if estado_listo:
+            pedido.idEstado = estado_listo
             pedido.save()
-        messages.success(request, f'Pedido de Mesa {pedido.idMesa.numMesa} marcado como entregado.')
+        messages.success(request, f'Pedido de Mesa {pedido.idMesa.numMesa} marcado como listo.')
         return redirect('panel_cocina')
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
