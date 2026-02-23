@@ -109,6 +109,12 @@ class Pedido(models.Model):
     idMesa = models.ForeignKey(Mesa, on_delete=models.PROTECT, related_name='pedidos', verbose_name="Mesa")
     idEstado = models.ForeignKey(Estado, on_delete=models.PROTECT, related_name='pedidos', verbose_name="Estado")
     fecha = models.DateTimeField(auto_now_add=True)
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def calcular_total(self):
+        total = sum(d.subtotal() for d in self.detalles.all())
+        self.total = total
+        self.save()
 
     def __str__(self):
         return f"Pedido #{self.pk} - Mesa {self.idMesa.numMesa}"
@@ -117,3 +123,24 @@ class Pedido(models.Model):
         verbose_name = "Pedido"
         verbose_name_plural = "Pedidos"
         ordering = ['-fecha']
+
+    class Meta:
+        verbose_name = "Pedido"
+        verbose_name_plural = "Pedidos"
+        ordering = ['-fecha']
+class DetallePedido(models.Model):
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='detalles')
+    plato = models.ForeignKey(Plato, on_delete=models.PROTECT)
+    cantidad = models.PositiveIntegerField(default=1)
+    notas = models.CharField(max_length=200, blank=True)
+    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def subtotal(self):
+        return self.cantidad * self.precio_unitario
+
+    def __str__(self):
+        return f"{self.cantidad}x {self.plato.nombre}"
+
+    class Meta:
+        verbose_name = "Detalle de Pedido"
+        verbose_name_plural = "Detalles de Pedido"

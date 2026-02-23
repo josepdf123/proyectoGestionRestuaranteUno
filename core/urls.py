@@ -7,6 +7,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('recuperar-contrasena/', views.recuperar_contrasena, name='recuperar_contrasena'),
     path('reset-password/<str:token>/', views.reset_password, name='reset_password'),
+    path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado'),
 
     # Mesas
     path('mesas/', views.mesas_lista, name='mesas_lista'),
@@ -27,4 +28,11 @@ urlpatterns = [
     path('usuarios/', views.usuarios_lista, name='usuarios_lista'),
     path('usuarios/eliminar/<int:pk>/', views.usuario_eliminar, name='usuario_eliminar'),
     path('usuarios/editar/<int:pk>/', views.usuario_editar, name='usuario_editar'),
+
+    # Mesero
+    path('mesero/', views.panel_mesero, name='panel_mesero'),
+    path('mesero/mesa/<int:pk>/', views.mesa_pedido, name='mesa_pedido'),
+
+    # Cocina
+    path('cocina/', views.panel_cocina, name='panel_cocina'),
 ]

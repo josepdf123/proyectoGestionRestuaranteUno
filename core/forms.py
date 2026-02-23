@@ -28,11 +28,7 @@ class MesaForm(forms.ModelForm):
             idRol__descripcion__iexact='Mesero'
         )
         # Solo los 3 primeros estados
-        #self.fields['estado'].queryset = Estado.objects.all()
-        
-        self.fields['estado'].queryset = Estado.objects.filter(
-        descripcion__in=['Disponible', 'Reservada', 'Ocupada']
-    )
+        self.fields['estado'].queryset = Estado.objects.all()[:3]
 
 class PlatoForm(forms.ModelForm):
     class Meta:
@@ -100,7 +96,7 @@ class UsuarioForm(forms.ModelForm):
         }
         widgets = {
             'usuario': forms.TextInput(attrs={'class': 'form-control'}),
-            'contrasena': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'contrasena': forms.PasswordInput(attrs={'class': 'form-control', 'autocomplete': 'new-password'}),
             'correo': forms.EmailInput(attrs={'class': 'form-control'}),
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'apellido': forms.TextInput(attrs={'class': 'form-control'}),

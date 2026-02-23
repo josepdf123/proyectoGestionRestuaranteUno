@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 from .models import Rol, Usuario, Estado, Mesa, Plato, Menu, MenuPlato, Pedido
-
+from .models import DetallePedido 
 
 @admin.register(Rol)
 class RolAdmin(admin.ModelAdmin):
@@ -42,3 +42,7 @@ class MenuPlatoAdmin(admin.ModelAdmin):
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
     list_display = ['id', 'idMesa', 'idUsuario', 'idEstado', 'fecha']
+
+@admin.register(DetallePedido)
+class DetallePedidoAdmin(admin.ModelAdmin):
+    list_display = ['pedido', 'plato', 'cantidad', 'precio_unitario']

@@ -35,30 +35,57 @@
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <a class="nav-link {% block nav_usuarios %}{% endblock %}" href="{% url 'usuarios_lista' %}">
-                        <i class="bi bi-people"></i> Usuarios
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link {% block nav_mesas %}{% endblock %}" href="{% url 'mesas_lista' %}">
-                        <i class="bi bi-grid-3x3-gap"></i> Mesas
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% block nav_platos %}{% endblock %}" href="{% url 'platos_lista' %}">
-                        <i class="bi bi-egg-fried"></i> Platos
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% block nav_menus %}{% endblock %}" href="{% url 'menus_lista' %}">
-                        <i class="bi bi-journal-text"></i> Menús
-                    </a>
-                </li>
-                
-            </ul>
+           <ul class="navbar-nav me-auto">
+    {% if request.session.usuario_rol == 'Administrador' %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'mesas_lista' %}">
+                <i class="bi bi-grid-3x3-gap"></i> Mesas
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'platos_lista' %}">
+                <i class="bi bi-egg-fried"></i> Platos
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'menus_lista' %}">
+                <i class="bi bi-journal-text"></i> Menús
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'usuarios_lista' %}">
+                <i class="bi bi-people"></i> Usuarios
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_mesero' %}">
+                <i class="bi bi-person-badge"></i> Mesero
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_cocina' %}">
+                <i class="bi bi-fire"></i> Cocina
+            </a>
+        </li>
+    {% elif request.session.usuario_rol == 'Mesero' %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_mesero' %}">
+                <i class="bi bi-person-badge"></i> Mesero
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_cocina' %}">
+                <i class="bi bi-fire"></i> Cocina
+            </a>
+        </li>
+    {% elif request.session.usuario_rol == 'Cocinero' %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_cocina' %}">
+                <i class="bi bi-fire"></i> Cocina
+            </a>
+        </li>
+    {% endif %}
+</ul>
             <!-- Info del usuario logueado -->
             <ul class="navbar-nav ms-auto">
                 {% if request.session.usuario_id %}
@@ -101,4 +128,4 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 {% block extra_js %}{% endblock %}
 </body>
-</html> 
+</html>
