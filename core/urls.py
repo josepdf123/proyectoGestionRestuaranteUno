@@ -35,4 +35,7 @@ urlpatterns = [
 
     # Cocina
     path('cocina/', views.panel_cocina, name='panel_cocina'),
+    
+    #Reportes
+    path('reportes/', views.reportes, name='reportes'),
 ]

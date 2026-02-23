@@ -6,6 +6,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
 from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido
+from datetime import date, timedelta
 
 # ─── DECORADORES DE SEGURIDAD ─────────────────────────────────────────────────
 
@@ -427,3 +428,53 @@ def panel_cocina(request):
         return redirect('panel_cocina')
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
+
+#-------REPORTES-------
+@rol_requerido('Administrador')
+def reportes(request):
+    hoy = date.today()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    inicio_mes = hoy.replace(day=1)
+
+    pedidos_entregados = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado'
+    ).select_related('idMesa', 'idUsuario').prefetch_related('detalles__plato')
+
+    # Diario
+    pedidos_hoy = pedidos_entregados.filter(fecha__date=hoy)
+    total_hoy = sum(p.total for p in pedidos_hoy)
+
+    # Semanal
+    pedidos_semana = pedidos_entregados.filter(fecha__date__gte=inicio_semana)
+    total_semana = sum(p.total for p in pedidos_semana)
+
+    # Mensual
+    pedidos_mes = pedidos_entregados.filter(fecha__date__gte=inicio_mes)
+    total_mes = sum(p.total for p in pedidos_mes)
+
+    # Por camarero (hoy)
+    meseros = Usuario.objects.filter(idRol__descripcion__iexact='mesero')
+    reporte_camareros = []
+    for mesero in meseros:
+        pedidos_mesero = pedidos_entregados.filter(idUsuario=mesero, fecha__date=hoy)
+        mesas = pedidos_mesero.values('idMesa').distinct().count()
+        total = sum(p.total for p in pedidos_mesero)
+        reporte_camareros.append({
+            'nombre': f"{mesero.nombre} {mesero.apellido}",
+            'mesas': mesas,
+            'pedidos': pedidos_mesero.count(),
+            'total': total,
+        })
+
+    return render(request, 'core/reportes.html', {
+        'hoy': hoy,
+        'pedidos_hoy': pedidos_hoy,
+        'total_hoy': total_hoy,
+        'pedidos_semana': pedidos_semana,
+        'total_semana': total_semana,
+        'pedidos_mes': pedidos_mes,
+        'total_mes': total_mes,
+        'reporte_camareros': reporte_camareros,
+        'inicio_semana': inicio_semana,
+        'inicio_mes': inicio_mes,
+    })
