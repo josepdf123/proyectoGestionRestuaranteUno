@@ -7,6 +7,9 @@ from django.contrib import messages
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
 from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido
 
+from django.utils import timezone
+from datetime import timedelta
+
 # ─── DECORADORES DE SEGURIDAD ─────────────────────────────────────────────────
 
 def login_requerido(view_func):
@@ -45,12 +48,41 @@ def login_view(request):
         usuario_input = request.POST.get('usuario')
         contrasena_input = request.POST.get('contrasena')
         try:
-            usuario = Usuario.objects.get(usuario=usuario_input, contrasena=contrasena_input)
-            request.session['usuario_id'] = usuario.pk
-            request.session['usuario_nombre'] = usuario.nombre
-            request.session['usuario_rol'] = usuario.idRol.descripcion
-            messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
-            return redirect('dashboard')
+            usuario = Usuario.objects.get(usuario=usuario_input)
+
+            # Verificar si está bloqueado
+            if usuario.bloqueado_hasta and usuario.bloqueado_hasta > timezone.now():
+                tiempo_restante = (usuario.bloqueado_hasta - timezone.now()).seconds
+                minutos = tiempo_restante // 60
+                segundos = tiempo_restante % 60
+                messages.error(request, f'Usuario bloqueado. Intenta de nuevo en {minutos}m {segundos}s.')
+                return render(request, 'core/login.html')
+
+            # Verificar contraseña
+            if usuario.contrasena == contrasena_input:
+                # Login exitoso, resetear intentos
+                usuario.intentos_fallidos = 0
+                usuario.bloqueado_hasta = None
+                usuario.save()
+
+                request.session['usuario_id'] = usuario.pk
+                request.session['usuario_nombre'] = usuario.nombre
+                request.session['usuario_rol'] = usuario.idRol.descripcion
+                messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
+                return redirect('dashboard')
+            else:
+                # Contraseña incorrecta
+                usuario.intentos_fallidos += 1
+                if usuario.intentos_fallidos >= 3:
+                    usuario.bloqueado_hasta = timezone.now() + timedelta(minutes=2)
+                    usuario.intentos_fallidos = 0
+                    usuario.save()
+                    messages.error(request, 'Demasiados intentos fallidos. Usuario bloqueado por 2 minutos.')
+                else:
+                    intentos_restantes = 3 - usuario.intentos_fallidos
+                    usuario.save()
+                    messages.error(request, f'Contraseña incorrecta. Te quedan {intentos_restantes} intento(s).')
+
         except Usuario.DoesNotExist:
             messages.error(request, 'Usuario o contraseña incorrectos.')
 
