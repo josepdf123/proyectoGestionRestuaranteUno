@@ -67,6 +67,11 @@
                 <i class="bi bi-fire"></i> Cocina
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_cajero' %}">
+                <i class="bi bi-cash-register"></i> Caja
+            </a>
+        </li>
     {% elif request.session.usuario_rol == 'Mesero' %}
         <li class="nav-item">
             <a class="nav-link" href="{% url 'panel_mesero' %}">
@@ -84,7 +89,24 @@
                 <i class="bi bi-fire"></i> Cocina
             </a>
         </li>
+
+    {% elif request.session.usuario_rol == 'Cajero' %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'panel_cajero' %}">
+                <i class="bi bi-cash-register"></i> Caja
+            </a>
+        </li>
+
+
+
     {% endif %}
+
+    
+    
+
+
+
+    
 </ul>
             <!-- Info del usuario logueado -->
             <ul class="navbar-nav ms-auto">

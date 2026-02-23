@@ -39,7 +39,7 @@ class PlatoForm(forms.ModelForm):
             'nombre': 'Nombre del Plato',
             'descripcion': 'Descripción',
             'precio': 'Precio',
-            'idUsuario': 'Usuario Responsable',
+            'idUsuario': 'Cocinero Responsable',
         }
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Bandeja Paisa'}),
@@ -47,6 +47,12 @@ class PlatoForm(forms.ModelForm):
             'precio': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'idUsuario': forms.Select(attrs={'class': 'form-select'}),
         }
+        
+    def __init__(self, *args, **kwargs):  # ← fuera de Meta
+        super().__init__(*args, **kwargs)
+        self.fields['idUsuario'].queryset = Usuario.objects.filter(
+            idRol__descripcion__iexact='Cocinero'
+        )
 
 
 class MenuForm(forms.ModelForm):

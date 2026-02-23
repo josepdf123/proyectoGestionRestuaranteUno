@@ -4,6 +4,12 @@ from django.contrib import admin
 from .models import Rol, Usuario, Estado, Mesa, Plato, Menu, MenuPlato, Pedido
 from .models import DetallePedido 
 
+from .models import CierreCaja
+
+@admin.register(CierreCaja)
+class CierreCajaAdmin(admin.ModelAdmin):
+    list_display = ['fecha', 'efectivo', 'electronico', 'total_ventas', 'registrado_por']
+
 @admin.register(Rol)
 class RolAdmin(admin.ModelAdmin):
     list_display = ['id', 'descripcion']

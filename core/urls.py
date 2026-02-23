@@ -37,4 +37,7 @@ urlpatterns = [
     path('cocina/', views.panel_cocina, name='panel_cocina'),
     
     path('dashboard/', views.dashboard, name='dashboard'),
+    path('cajero/', views.panel_cajero, name='panel_cajero'),
+    path('cajero/historial/', views.historial_cierres, name='historial_cierres'),
+    
 ]

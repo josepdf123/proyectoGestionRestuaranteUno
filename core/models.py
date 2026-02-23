@@ -1,5 +1,7 @@
 # core/models.py
 
+from decimal import Decimal
+
 from django.db import models
 
 
@@ -147,3 +149,23 @@ class DetallePedido(models.Model):
     class Meta:
         verbose_name = "Detalle de Pedido"
         verbose_name_plural = "Detalles de Pedido"
+        
+        
+class CierreCaja(models.Model):
+    fecha = models.DateField(auto_now_add=True)
+    efectivo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    electronico = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_ventas = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    registrado_por = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='cierres')
+
+    def total(self):
+        from decimal import Decimal
+        return Decimal(str(self.efectivo)) + Decimal(str(self.electronico))
+
+    def __str__(self):
+        return f"Cierre {self.fecha} - Total: ${self.total()}"
+
+    class Meta:
+        verbose_name = "Cierre de Caja"
+        verbose_name_plural = "Cierres de Caja"
+        ordering = ['-fecha']

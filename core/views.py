@@ -1,11 +1,18 @@
 # core/views.py
+from decimal import Decimal
+from urllib import request
 import uuid
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
-from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido
+from decimal import Decimal
+from django.db.models import Sum
+from django.utils.timezone import now
+
+
+from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido, CierreCaja
 
 from django.utils import timezone
 from datetime import timedelta
@@ -101,8 +108,9 @@ def dashboard(request):
         return redirect('panel_mesero')
     elif rol == 'Cocinero':
         return redirect('panel_cocina')
+    elif rol == 'Cajero':
+        return redirect('panel_cajero')
     else:
-        # Cajero u otros roles
         return render(request, 'core/bienvenida.html', {
             'usuario': request.session.get('usuario_nombre'),
             'rol': rol,
@@ -466,3 +474,106 @@ def panel_cocina(request):
         return redirect('panel_cocina')
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
+
+
+
+# ─── PANEL CAJERO ─────────────────────────────────────────────────────────────
+
+from django.db.models import Sum
+from django.utils.timezone import now
+
+
+
+@rol_requerido('Administrador', 'Cajero')
+def panel_cajero(request):
+    from .models import CierreCaja
+    hoy = now().date()
+
+    # Ventas del día (pedidos entregados hoy)
+    ventas_hoy = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado',
+        fecha__date=hoy
+    ).aggregate(total=Sum('total'))['total'] or 0
+    
+    
+     # Pedidos listos (salieron de cocina pero aún no entregados)
+    total_listos = Pedido.objects.filter(
+        idEstado__descripcion__iexact='listo',
+        fecha__date=hoy
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    # Total combinado para comparar en caja
+    total_para_cobrar = ventas_hoy + total_listos
+    
+
+    # Ventas del mes
+    ventas_mes = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado',
+        fecha__year=hoy.year,
+        fecha__month=hoy.month
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    # Historial de cierres
+    cierres = CierreCaja.objects.all()[:10]
+
+    # Cierre de hoy si ya existe
+    cierre_hoy = CierreCaja.objects.filter(fecha=hoy).first()
+
+    if request.method == 'POST':
+        efectivo = Decimal(str(request.POST.get('efectivo') or 0))
+        electronico = Decimal(str(request.POST.get('electronico') or 0))
+        usuario = Usuario.objects.get(pk=request.session['usuario_id'])
+
+        if cierre_hoy:
+            # Actualizar cierre existente
+            cierre_hoy.efectivo = efectivo
+            cierre_hoy.electronico = electronico
+            cierre_hoy.total_ventas = total_para_cobrar
+            cierre_hoy.save()
+            messages.success(request, f'Cierre del día actualizado. Total: ${cierre_hoy.total():,.0f}')
+        else:
+            # Crear nuevo cierre
+            cierre = CierreCaja.objects.create(
+                efectivo=efectivo,
+                electronico=electronico,
+                total_ventas=total_para_cobrar,
+                registrado_por=usuario,
+            )
+            messages.success(request, f'¡Cierre del día registrado! Total: ${cierre.total():,.0f}')
+
+        return redirect('panel_cajero')
+
+    return render(request, 'core/cajero/panel.html', {
+        'ventas_hoy': ventas_hoy,
+        'total_listos': total_listos,
+        'total_para_cobrar': total_para_cobrar,
+        'ventas_mes': ventas_mes,
+        'cierres': cierres,
+        'cierre_hoy': cierre_hoy,
+        'hoy': hoy,
+    })
+@rol_requerido('Administrador', 'Cajero')
+def historial_cierres(request):
+        from decimal import Decimal
+        hoy = now().date()
+
+        mes = request.GET.get('mes', hoy.month)
+        anio = request.GET.get('anio', hoy.year)
+
+        cierres = CierreCaja.objects.filter(
+            fecha__year=anio,
+            fecha__month=mes
+        ).select_related('registrado_por')
+
+        total_mes_efectivo = sum(c.efectivo for c in cierres)
+        total_mes_electronico = sum(c.electronico for c in cierres)
+        total_mes = total_mes_efectivo + total_mes_electronico
+
+        return render(request, 'core/cajero/historial.html', {
+            'cierres': cierres,
+            'mes': int(mes),
+            'anio': int(anio),
+            'total_mes_efectivo': total_mes_efectivo,
+            'total_mes_electronico': total_mes_electronico,
+            'total_mes': total_mes,
+        })
