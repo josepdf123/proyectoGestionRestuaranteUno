@@ -365,7 +365,9 @@ def panel_mesero(request):
 def mesa_pedido(request, pk):
     mesa = get_object_or_404(Mesa, pk=pk)
     platos = Plato.objects.all()
-    estados = Estado.objects.all()
+    estados = Estado.objects.filter(
+    descripcion__in=['Disponible', 'Reservada', 'Ocupada']
+        )
 
     pedido_activo = mesa.pedidos.filter(
         idEstado__descripcion__iexact='pendiente'
