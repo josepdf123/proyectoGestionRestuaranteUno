@@ -5,6 +5,7 @@ urlpatterns = [
     # Auth
     path('', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('dashboard/', views.dashboard, name='dashboard'),
     path('recuperar-contrasena/', views.recuperar_contrasena, name='recuperar_contrasena'),
     path('reset-password/<str:token>/', views.reset_password, name='reset_password'),
     path('acceso-denegado/', views.acceso_denegado, name='acceso_denegado'),
@@ -35,7 +36,11 @@ urlpatterns = [
 
     # Cocina
     path('cocina/', views.panel_cocina, name='panel_cocina'),
-    
-    #Reportes
+
+    # Cajero
+    path('cajero/', views.panel_cajero, name='panel_cajero'),
+    path('cajero/historial/', views.historial_cierres, name='historial_cierres'),
+
+    # Reportes
     path('reportes/', views.reportes, name='reportes'),
 ]

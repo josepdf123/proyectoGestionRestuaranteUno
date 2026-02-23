@@ -1,5 +1,4 @@
-# core/models.py
-
+from decimal import Decimal
 from django.db import models
 
 
@@ -21,7 +20,10 @@ class Usuario(models.Model):
     correo = models.EmailField(unique=True)
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
-    token_recuperacion = models.CharField(max_length=100, blank=True, null=True)
+    token_recuperacion = models.CharField(max_length=255, blank=True, null=True)
+    # Campos para bloqueo de cuenta (aporte Yonatan)
+    intentos_fallidos = models.IntegerField(default=0)
+    bloqueado_hasta = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.nombre} {self.apellido} ({self.usuario})"
@@ -124,10 +126,7 @@ class Pedido(models.Model):
         verbose_name_plural = "Pedidos"
         ordering = ['-fecha']
 
-    class Meta:
-        verbose_name = "Pedido"
-        verbose_name_plural = "Pedidos"
-        ordering = ['-fecha']
+
 class DetallePedido(models.Model):
     pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='detalles')
     plato = models.ForeignKey(Plato, on_delete=models.PROTECT)
@@ -144,3 +143,23 @@ class DetallePedido(models.Model):
     class Meta:
         verbose_name = "Detalle de Pedido"
         verbose_name_plural = "Detalles de Pedido"
+
+
+class CierreCaja(models.Model):
+    # Aporte de Yonatan
+    fecha = models.DateField(auto_now_add=True)
+    efectivo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    electronico = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_ventas = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    registrado_por = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='cierres')
+
+    def total(self):
+        return Decimal(str(self.efectivo)) + Decimal(str(self.electronico))
+
+    def __str__(self):
+        return f"Cierre {self.fecha} - Total: ${self.total()}"
+
+    class Meta:
+        verbose_name = "Cierre de Caja"
+        verbose_name_plural = "Cierres de Caja"
+        ordering = ['-fecha']

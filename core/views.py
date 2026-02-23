@@ -1,12 +1,17 @@
 # core/views.py
+from decimal import Decimal
 import uuid
+from datetime import date, timedelta
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.db.models import Sum
+from django.utils import timezone
+from django.utils.timezone import now
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
-from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido
-from datetime import date, timedelta
+from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido, CierreCaja
+
 
 # ─── DECORADORES DE SEGURIDAD ─────────────────────────────────────────────────
 
@@ -40,35 +45,64 @@ def rol_requerido(*roles_permitidos):
 
 def login_view(request):
     if request.session.get('usuario_id'):
-        rol = request.session.get('usuario_rol', '')
-        if rol == 'Mesero':
-            return redirect('panel_mesero')
-        elif rol == 'Cocinero':
-            return redirect('panel_cocina')
-        return redirect('mesas_lista')
+        return redirect('dashboard')
 
     if request.method == 'POST':
         usuario_input = request.POST.get('usuario')
         contrasena_input = request.POST.get('contrasena')
         try:
-            usuario = Usuario.objects.get(usuario=usuario_input, contrasena=contrasena_input)
-            request.session['usuario_id'] = usuario.pk
-            request.session['usuario_nombre'] = usuario.nombre
-            request.session['usuario_rol'] = usuario.idRol.descripcion
-            messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
-            rol = usuario.idRol.descripcion
-            if rol == 'Administrador':
-                return redirect('mesas_lista')
-            elif rol == 'Mesero':
-                return redirect('panel_mesero')
-            elif rol == 'Cocinero':
-                return redirect('panel_cocina')
+            usuario = Usuario.objects.get(usuario=usuario_input)
+
+            # Verificar si está bloqueado (aporte Yonatan)
+            if usuario.bloqueado_hasta and usuario.bloqueado_hasta > timezone.now():
+                tiempo_restante = (usuario.bloqueado_hasta - timezone.now()).seconds
+                minutos = tiempo_restante // 60
+                segundos = tiempo_restante % 60
+                messages.error(request, f'Usuario bloqueado. Intenta de nuevo en {minutos}m {segundos}s.')
+                return render(request, 'core/login.html')
+
+            # Verificar contraseña
+            if usuario.contrasena == contrasena_input:
+                usuario.intentos_fallidos = 0
+                usuario.bloqueado_hasta = None
+                usuario.save()
+                request.session['usuario_id'] = usuario.pk
+                request.session['usuario_nombre'] = usuario.nombre
+                request.session['usuario_rol'] = usuario.idRol.descripcion
+                messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
+                return redirect('dashboard')
             else:
-                return redirect('mesas_lista')
+                usuario.intentos_fallidos += 1
+                if usuario.intentos_fallidos >= 3:
+                    usuario.bloqueado_hasta = timezone.now() + timedelta(minutes=2)
+                    usuario.intentos_fallidos = 0
+                    usuario.save()
+                    messages.error(request, 'Demasiados intentos fallidos. Usuario bloqueado por 2 minutos.')
+                else:
+                    intentos_restantes = 3 - usuario.intentos_fallidos
+                    usuario.save()
+                    messages.error(request, f'Contraseña incorrecta. Te quedan {intentos_restantes} intento(s).')
+
         except Usuario.DoesNotExist:
             messages.error(request, 'Usuario o contraseña incorrectos.')
 
     return render(request, 'core/login.html')
+
+
+def dashboard(request):
+    if not request.session.get('usuario_id'):
+        return redirect('login')
+    rol = request.session.get('usuario_rol', '')
+    if rol == 'Administrador':
+        return redirect('mesas_lista')
+    elif rol == 'Mesero':
+        return redirect('panel_mesero')
+    elif rol == 'Cocinero':
+        return redirect('panel_cocina')
+    elif rol == 'Cajero':
+        return redirect('panel_cajero')
+    else:
+        return redirect('login')
 
 
 def logout_view(request):
@@ -282,9 +316,16 @@ def usuarios_lista(request):
 @rol_requerido('Administrador')
 def usuario_eliminar(request, pk):
     usuario = get_object_or_404(Usuario, pk=pk)
+    
     if request.method == 'POST':
-        usuario.delete()
-        messages.success(request, f'Usuario "{usuario.usuario}" eliminado.')
+        try:
+            nombre_usuario = usuario.usuario  # Guardamos el nombre antes de borrar
+            usuario.delete()
+            messages.success(request, f'Usuario "{nombre_usuario}" eliminado.')
+        except ProtectedError:
+            # Este es el mensaje que se mostrará cuando tenga mesas asociadas
+            messages.error(request, f'No se puede eliminar a "{usuario.usuario}" porque tiene mesas o registros asociados (está siendo referenciado).')
+            
     return redirect('usuarios_lista')
 
 
@@ -319,7 +360,7 @@ def panel_mesero(request):
 def mesa_pedido(request, pk):
     mesa = get_object_or_404(Mesa, pk=pk)
     platos = Plato.objects.all()
-    estados = Estado.objects.all()
+    estados = Estado.objects.filter(descripcion__in=['Disponible', 'Reservada', 'Ocupada'])
 
     pedido_activo = mesa.pedidos.filter(
         idEstado__descripcion__iexact='pendiente'
@@ -429,7 +470,94 @@ def panel_cocina(request):
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
 
-#-------REPORTES-------
+
+# ─── PANEL CAJERO ─────────────────────────────────────────────────────────────
+
+@rol_requerido('Administrador', 'Cajero')
+def panel_cajero(request):
+    hoy = now().date()
+
+    ventas_hoy = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado',
+        fecha__date=hoy
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    total_listos = Pedido.objects.filter(
+        idEstado__descripcion__iexact='listo',
+        fecha__date=hoy
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    total_para_cobrar = ventas_hoy + total_listos
+
+    ventas_mes = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado',
+        fecha__year=hoy.year,
+        fecha__month=hoy.month
+    ).aggregate(total=Sum('total'))['total'] or 0
+
+    cierres = CierreCaja.objects.all()[:10]
+    cierre_hoy = CierreCaja.objects.filter(fecha=hoy).first()
+
+    if request.method == 'POST':
+        efectivo = Decimal(str(request.POST.get('efectivo') or 0))
+        electronico = Decimal(str(request.POST.get('electronico') or 0))
+        usuario = Usuario.objects.get(pk=request.session['usuario_id'])
+
+        if cierre_hoy:
+            cierre_hoy.efectivo = efectivo
+            cierre_hoy.electronico = electronico
+            cierre_hoy.total_ventas = total_para_cobrar
+            cierre_hoy.save()
+            messages.success(request, f'Cierre del día actualizado. Total: ${cierre_hoy.total():,.0f}')
+        else:
+            cierre = CierreCaja.objects.create(
+                efectivo=efectivo,
+                electronico=electronico,
+                total_ventas=total_para_cobrar,
+                registrado_por=usuario,
+            )
+            messages.success(request, f'¡Cierre del día registrado! Total: ${cierre.total():,.0f}')
+
+        return redirect('panel_cajero')
+
+    return render(request, 'core/cajero/panel.html', {
+        'ventas_hoy': ventas_hoy,
+        'total_listos': total_listos,
+        'total_para_cobrar': total_para_cobrar,
+        'ventas_mes': ventas_mes,
+        'cierres': cierres,
+        'cierre_hoy': cierre_hoy,
+        'hoy': hoy,
+    })
+
+
+@rol_requerido('Administrador', 'Cajero')
+def historial_cierres(request):
+    hoy = now().date()
+    mes = request.GET.get('mes', hoy.month)
+    anio = request.GET.get('anio', hoy.year)
+
+    cierres = CierreCaja.objects.filter(
+        fecha__year=anio,
+        fecha__month=mes
+    ).select_related('registrado_por')
+
+    total_mes_efectivo = sum(c.efectivo for c in cierres)
+    total_mes_electronico = sum(c.electronico for c in cierres)
+    total_mes = total_mes_efectivo + total_mes_electronico
+
+    return render(request, 'core/cajero/historial.html', {
+        'cierres': cierres,
+        'mes': int(mes),
+        'anio': int(anio),
+        'total_mes_efectivo': total_mes_efectivo,
+        'total_mes_electronico': total_mes_electronico,
+        'total_mes': total_mes,
+    })
+
+
+# ─── REPORTES ─────────────────────────────────────────────────────────────────
+
 @rol_requerido('Administrador')
 def reportes(request):
     hoy = date.today()
@@ -440,19 +568,15 @@ def reportes(request):
         idEstado__descripcion__iexact='entregado'
     ).select_related('idMesa', 'idUsuario').prefetch_related('detalles__plato')
 
-    # Diario
     pedidos_hoy = pedidos_entregados.filter(fecha__date=hoy)
     total_hoy = sum(p.total for p in pedidos_hoy)
 
-    # Semanal
     pedidos_semana = pedidos_entregados.filter(fecha__date__gte=inicio_semana)
     total_semana = sum(p.total for p in pedidos_semana)
 
-    # Mensual
     pedidos_mes = pedidos_entregados.filter(fecha__date__gte=inicio_mes)
     total_mes = sum(p.total for p in pedidos_mes)
 
-    # Por camarero (hoy)
     meseros = Usuario.objects.filter(idRol__descripcion__iexact='mesero')
     reporte_camareros = []
     for mesero in meseros:
