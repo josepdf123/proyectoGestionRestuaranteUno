@@ -39,12 +39,7 @@ def rol_requerido(*roles_permitidos):
 
 def login_view(request):
     if request.session.get('usuario_id'):
-        rol = request.session.get('usuario_rol', '')
-        if rol == 'Mesero':
-            return redirect('panel_mesero')
-        elif rol == 'Cocinero':
-            return redirect('panel_cocina')
-        return redirect('mesas_lista')
+        return redirect('dashboard')
 
     if request.method == 'POST':
         usuario_input = request.POST.get('usuario')
@@ -55,19 +50,31 @@ def login_view(request):
             request.session['usuario_nombre'] = usuario.nombre
             request.session['usuario_rol'] = usuario.idRol.descripcion
             messages.success(request, f'¡Bienvenido, {usuario.nombre}!')
-            rol = usuario.idRol.descripcion
-            if rol == 'Administrador':
-                return redirect('mesas_lista')
-            elif rol == 'Mesero':
-                return redirect('panel_mesero')
-            elif rol == 'Cocinero':
-                return redirect('panel_cocina')
-            else:
-                return redirect('mesas_lista')
+            return redirect('dashboard')
         except Usuario.DoesNotExist:
             messages.error(request, 'Usuario o contraseña incorrectos.')
 
     return render(request, 'core/login.html')
+
+
+def dashboard(request):
+    if not request.session.get('usuario_id'):
+        return redirect('login')
+
+    rol = request.session.get('usuario_rol', '')
+
+    if rol == 'Administrador':
+        return redirect('mesas_lista')
+    elif rol == 'Mesero':
+        return redirect('panel_mesero')
+    elif rol == 'Cocinero':
+        return redirect('panel_cocina')
+    else:
+        # Cajero u otros roles
+        return render(request, 'core/bienvenida.html', {
+            'usuario': request.session.get('usuario_nombre'),
+            'rol': rol,
+        })
 
 
 def logout_view(request):

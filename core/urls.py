@@ -35,4 +35,6 @@ urlpatterns = [
 
     # Cocina
     path('cocina/', views.panel_cocina, name='panel_cocina'),
+    
+    path('dashboard/', views.dashboard, name='dashboard'),
 ]
