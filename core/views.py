@@ -11,7 +11,7 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils.timezone import now
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
-from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido, CierreCaja
+from .models import Mesa, Plato, Menu, MenuPlato, Estado, Usuario, Pedido, Rol, DetallePedido, CierreCaja, Pago
 
 
 # ─── DECORADORES DE SEGURIDAD ─────────────────────────────────────────────────
@@ -463,23 +463,17 @@ def mesa_pedido(request, pk):
 
 @rol_requerido('Administrador', 'Mesero', 'Cocinero')
 def panel_cocina(request):
-    pedidos = Pedido.objects.filter(idEstado__in=[7, 9]).prefetch_related('detalles__plato').select_related('idMesa')
+    estado_cocina = Estado.objects.filter(descripcion__iexact='en cocina').first()
+    pedidos = Pedido.objects.filter(idEstado=estado_cocina).prefetch_related('detalles__plato').select_related('idMesa') if estado_cocina else []
 
     if request.method == 'POST':
         pedido_id = request.POST.get('pedido_id')
-        accion = request.POST.get('accion')
         pedido = get_object_or_404(Pedido, pk=pedido_id)
-        if accion == 'preparando':
-            pedido.idEstado = Estado.objects.get(id=9)
-            messages.success(request, f'Pedido #{pedido.pk} pasado a En Preparación.')
-        elif accion == 'listo':
-            pedido.idEstado = Estado.objects.get(id=8)
-            messages.success(request, f'Pedido #{pedido.pk} marcado como Listo.')
-        elif accion == 'cancelar':
-            pedido.idEstado = Estado.objects.get(id=6)
-            messages.warning(request, f'Pedido #{pedido.pk} cancelado.')
-
-        pedido.save()
+        estado_listo = Estado.objects.filter(descripcion__iexact='listo').first()
+        if estado_listo:
+            pedido.idEstado = estado_listo
+            pedido.save()
+        messages.success(request, f'Pedido de Mesa {pedido.idMesa.numMesa} marcado como listo.')
         return redirect('panel_cocina')
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
@@ -657,8 +651,113 @@ def estadisticas_mesero(request):
         'mesas_periodo': mesas_periodo,
         'hoy': hoy,
     })
-    
-    # ─── REPORTE DE PEDIDOS ───────────────────────────────────────────────────────
+
+
+#Daniela
+# ─── CAJERO: COBRO POR MESA ─────────────────────────────────────────────────
+
+@rol_requerido('Administrador', 'Cajero')
+def cajero_mesas(request):
+    """Lista de mesas con pedidos entregados pendientes de pago."""
+    estado_entregado = Estado.objects.filter(descripcion__iexact='entregado').first()
+    pedidos_por_cobrar = []
+    if estado_entregado:
+        pedidos_por_cobrar = (
+            Pedido.objects
+            .filter(idEstado=estado_entregado)
+            .exclude(pago__isnull=False)
+            .select_related('idMesa', 'idEstado')
+            .prefetch_related('detalles__plato')
+        )
+    pagos_hoy = (
+        Pago.objects
+        .filter(fecha__date=now().date())
+        .select_related('pedido__idMesa', 'cajero')
+    )
+    total_cobrado_hoy = sum(p.total for p in pagos_hoy)
+    return render(request, 'core/cajero/mesas.html', {
+        'pedidos_por_cobrar': pedidos_por_cobrar,
+        'pagos_hoy': pagos_hoy,
+        'total_cobrado_hoy': total_cobrado_hoy,
+    })
+
+
+@rol_requerido('Administrador', 'Cajero')
+def cajero_consulta_cuenta(request, pedido_pk):
+    """Desglose detallado de artículos y total de un pedido."""
+    pedido = get_object_or_404(Pedido, pk=pedido_pk)
+    if hasattr(pedido, 'pago'):
+        messages.warning(request, 'Este pedido ya fue cobrado.')
+        return redirect('cajero_mesas')
+    detalles = pedido.detalles.select_related('plato').all()
+    return render(request, 'core/cajero/consulta_cuenta.html', {
+        'pedido': pedido,
+        'detalles': detalles,
+    })
+
+
+@rol_requerido('Administrador', 'Cajero')
+def cajero_registrar_pago(request, pedido_pk):
+    """Registra el pago, cambia estado del pedido y libera la mesa."""
+    pedido = get_object_or_404(Pedido, pk=pedido_pk)
+    if hasattr(pedido, 'pago'):
+        messages.warning(request, 'Este pedido ya fue cobrado.')
+        return redirect('cajero_mesas')
+    detalles = pedido.detalles.select_related('plato').all()
+
+    if request.method == 'POST':
+        metodo = request.POST.get('metodo_pago')
+        if metodo not in ['efectivo', 'tarjeta', 'nequi', 'daviplata']:
+            messages.error(request, 'Selecciona un método de pago válido.')
+            return redirect('cajero_registrar_pago', pedido_pk=pedido_pk)
+
+        cajero = Usuario.objects.get(pk=request.session['usuario_id'])
+
+        # 1. Registrar el pago
+        pago = Pago.objects.create(
+            pedido=pedido,
+            cajero=cajero,
+            metodo_pago=metodo,
+            total=pedido.total,
+        )
+
+        # 2. Cambiar estado del pedido a 'Pagado'
+        estado_pagado = Estado.objects.filter(descripcion__iexact='pagado').first()
+        if estado_pagado:
+            pedido.idEstado = estado_pagado
+            pedido.save()
+
+        # 3. Liberar la mesa → Disponible
+        estado_disponible = Estado.objects.filter(descripcion__iexact='disponible').first()
+        if estado_disponible:
+            pedido.idMesa.estado = estado_disponible
+            pedido.idMesa.save()
+
+        messages.success(
+            request,
+            f'¡Pago registrado! Mesa {pedido.idMesa.numMesa} liberada. '
+            f'Total: ${pedido.total:,.0f} ({pago.get_metodo_pago_display()})'
+        )
+        return redirect('cajero_recibo', pago_pk=pago.pk)
+
+    return render(request, 'core/cajero/registrar_pago.html', {
+        'pedido': pedido,
+        'detalles': detalles,
+    })
+
+
+@rol_requerido('Administrador', 'Cajero')
+def cajero_recibo(request, pago_pk):
+    """Recibo de pago generado tras confirmar el cobro."""
+    pago = get_object_or_404(Pago, pk=pago_pk)
+    detalles = pago.pedido.detalles.select_related('plato').all()
+    return render(request, 'core/cajero/recibo.html', {
+        'pago': pago,
+        'detalles': detalles,
+    })
+
+
+# ─── REPORTE DE PEDIDOS ───────────────────────────────────────────────────────
 
 @rol_requerido('Administrador')
 def reporte_pedidos(request):

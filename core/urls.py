@@ -38,12 +38,17 @@ urlpatterns = [
     # Cocina
     path('cocina/', views.panel_cocina, name='panel_cocina'),
 
-    # Cajero
+    # Cajero - Panel y cierre
     path('cajero/', views.panel_cajero, name='panel_cajero'),
     path('cajero/historial/', views.historial_cierres, name='historial_cierres'),
 
+    # Cajero – cobro por mesa (Daniela)
+    path('cajero/mesas/', views.cajero_mesas, name='cajero_mesas'),
+    path('cajero/cuenta/<int:pedido_pk>/', views.cajero_consulta_cuenta, name='cajero_consulta_cuenta'),
+    path('cajero/pago/<int:pedido_pk>/', views.cajero_registrar_pago, name='cajero_registrar_pago'),
+    path('cajero/recibo/<int:pago_pk>/', views.cajero_recibo, name='cajero_recibo'),
+
     # Reportes
     path('reportes/', views.reportes, name='reportes'),
-    
     path('reporte/', views.reporte_pedidos, name='reporte_pedidos'),
 ]

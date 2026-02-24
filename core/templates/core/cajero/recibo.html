@@ -1,0 +1,96 @@
+{% extends 'core/base.html' %}
+{% block title %}Recibo #{{ pago.pk }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-success text-white text-center py-4">
+            <i class="bi bi-receipt-cutoff" style="font-size:2.5rem;"></i>
+            <h4 class="mb-0 mt-2">Recibo de Pago</h4>
+            <small class="opacity-75">Restaurante</small>
+        </div>
+        <div class="card-body px-4 py-3">
+            <div class="row mb-3 g-2">
+                <div class="col-6">
+                    <small class="text-muted d-block">Recibo N°</small>
+                    <span class="fw-bold">#{{ pago.pk }}</span>
+                </div>
+                <div class="col-6 text-end">
+                    <small class="text-muted d-block">Fecha y hora</small>
+                    <span class="fw-bold">{{ pago.fecha|date:'d/m/Y H:i' }}</span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Mesa</small>
+                    <span class="fw-bold">Mesa {{ pago.pedido.idMesa.numMesa }}</span>
+                </div>
+                <div class="col-6 text-end">
+                    <small class="text-muted d-block">Cajero</small>
+                    <span class="fw-bold">
+                        {{ pago.cajero.nombre }} {{ pago.cajero.apellido }}
+                    </span>
+                </div>
+            </div>
+            <hr class="my-2">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Artículo</th>
+                        <th class="text-center">Cant.</th>
+                        <th class="text-end">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for detalle in detalles %}
+                <tr>
+                    <td>{{ detalle.plato.nombre }}</td>
+                    <td class="text-center">{{ detalle.cantidad }}</td>
+                    <td class="text-end">${{ detalle.subtotal|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fs-5 fw-semibold">Total pagado:</span>
+                <span class="fs-4 fw-bold text-success">${{ pago.total|floatformat:0 }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted">Método de pago:</span>
+                <span>
+                {% if pago.metodo_pago == 'efectivo' %}
+                    <span class="badge bg-success fs-6">Efectivo</span>
+                {% elif pago.metodo_pago == 'tarjeta' %}
+                    <span class="badge bg-primary fs-6">Tarjeta</span>
+                {% elif pago.metodo_pago == 'nequi' %}
+                    <span class="badge fs-6" style="background:#7B2FF7">Nequi</span>
+                {% elif pago.metodo_pago == 'daviplata' %}
+                    <span class="badge bg-danger fs-6">Daviplata</span>
+                {% endif %}
+                </span>
+            </div>
+            <hr class="my-3">
+            <div class="text-center">
+                <p class="text-success fw-bold mb-1">
+                    <i class="bi bi-check-circle-fill me-1"></i>¡Pago confirmado!
+                </p>
+                <p class="text-muted small">
+                    Mesa {{ pago.pedido.idMesa.numMesa }} ha quedado disponible.
+                </p>
+            </div>
+        </div>
+        <div class="card-footer d-flex gap-2 px-4 pb-3">
+            <button onclick="window.print()" class="btn btn-outline-secondary flex-grow-1">
+                <i class="bi bi-printer me-1"></i>Imprimir
+            </button>
+            <a href="{% url 'cajero_mesas' %}" class="btn btn-success flex-grow-1">
+                <i class="bi bi-receipt me-1"></i>Cobrar otra mesa
+            </a>
+            <a href="{% url 'panel_cajero' %}" class="btn btn-outline-dark flex-grow-1">
+                <i class="bi bi-cash-register me-1"></i>Panel Caja
+            </a>
+        </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

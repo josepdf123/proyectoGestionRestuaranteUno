@@ -145,6 +145,16 @@ class DetallePedido(models.Model):
         verbose_name_plural = "Detalles de Pedido"
 
 
+###Daniela
+METODO_CHOICES = [
+    ('efectivo', 'Efectivo'),
+    ('tarjeta', 'Tarjeta'),
+    ('nequi', 'Nequi'),
+    ('daviplata', 'Daviplata'),
+]
+
+###
+
 class CierreCaja(models.Model):
     # Aporte de Yonatan
     fecha = models.DateField(auto_now_add=True)
@@ -152,6 +162,10 @@ class CierreCaja(models.Model):
     electronico = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_ventas = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     registrado_por = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='cierres')
+    
+   ###Daniela 
+    metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES, default='efectivo', verbose_name='Método de Pago Principal')
+    # ...
 
     def total(self):
         return Decimal(str(self.efectivo)) + Decimal(str(self.electronico))
@@ -162,4 +176,20 @@ class CierreCaja(models.Model):
     class Meta:
         verbose_name = "Cierre de Caja"
         verbose_name_plural = "Cierres de Caja"
+        ordering = ['-fecha']
+
+#### Daniela
+class Pago(models.Model):
+    pedido = models.OneToOneField(Pedido, on_delete=models.PROTECT, related_name='pago', verbose_name='Pedido')
+    cajero = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='pagos', verbose_name='Cajero')
+    metodo_pago = models.CharField(max_length=20, choices=METODO_CHOICES, verbose_name='Método de Pago')
+    total = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Total Pagado')
+    fecha = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de Pago')
+
+    def __str__(self):
+        return f'Pago #{self.pk} – Pedido #{self.pedido.pk} ({self.get_metodo_pago_display()})'
+
+    class Meta:
+        verbose_name = 'Pago'
+        verbose_name_plural = 'Pagos'
         ordering = ['-fecha']
