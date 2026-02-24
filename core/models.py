@@ -45,7 +45,7 @@ class Estado(models.Model):
 
 
 class Mesa(models.Model):
-    idUsuario = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='mesas', verbose_name="Usuario")
+    idUsuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='mesas', verbose_name="Usuario")
     estado = models.ForeignKey(Estado, on_delete=models.PROTECT, related_name='mesas')
     numMesa = models.IntegerField(unique=True, verbose_name="Número de Mesa")
     capacidad = models.IntegerField()

@@ -166,7 +166,9 @@ def mesas_lista(request):
     if request.method == 'POST':
         form = MesaForm(request.POST)
         if form.is_valid():
-            form.save()
+            mesa = form.save(commit=False)
+            mesa.idUsuario = Usuario.objects.get(pk=request.session['usuario_id'])
+            mesa.save()
             messages.success(request, '¡Mesa agregada correctamente!')
             return redirect('mesas_lista')
         else:
@@ -178,8 +180,11 @@ def mesas_lista(request):
 def mesa_eliminar(request, pk):
     mesa = get_object_or_404(Mesa, pk=pk)
     if request.method == 'POST':
-        mesa.delete()
-        messages.success(request, f'Mesa {mesa.numMesa} eliminada.')
+        try:
+            mesa.delete()
+            messages.success(request, f'Mesa {mesa.numMesa} eliminada.')
+        except Exception:
+            messages.error(request, f'No se puede eliminar la Mesa {mesa.numMesa} porque tiene registros asociados.')
     return redirect('mesas_lista')
 
 
@@ -205,12 +210,16 @@ def platos_lista(request):
     form = PlatoForm()
     if request.method == 'POST':
         form = PlatoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, '¡Plato agregado correctamente!')
-            return redirect('platos_lista')
-        else:
-            messages.error(request, 'Error al agregar el plato.')
+    if form.is_valid():
+        
+        plato = form.save(commit=False)
+        plato.idUsuario = Usuario.objects.get(pk=request.session['usuario_id'])
+        plato.save()
+        messages.success(request, '¡Plato agregado correctamente!')
+        return redirect('platos_lista')
+    else:
+        print(form.errors)
+        messages.error(request, 'Error al agregar el plato.')
     return render(request, 'core/platos.html', {'platos': platos, 'form': form})
 
 
@@ -218,8 +227,11 @@ def platos_lista(request):
 def plato_eliminar(request, pk):
     plato = get_object_or_404(Plato, pk=pk)
     if request.method == 'POST':
-        plato.delete()
-        messages.success(request, f'Plato "{plato.nombre}" eliminado.')
+        try:
+            plato.delete()
+            messages.success(request, f'Plato "{plato.nombre}" eliminado.')
+        except Exception:
+            messages.error(request, f'No se puede eliminar "{plato.nombre}" porque ya fue usado en pedidos.')
     return redirect('platos_lista')
 
 
@@ -317,18 +329,13 @@ def usuarios_lista(request):
 @rol_requerido('Administrador')
 def usuario_eliminar(request, pk):
     usuario = get_object_or_404(Usuario, pk=pk)
-    
     if request.method == 'POST':
         try:
-            nombre_usuario = usuario.usuario  # Guardamos el nombre antes de borrar
             usuario.delete()
-            messages.success(request, f'Usuario "{nombre_usuario}" eliminado.')
-        except ProtectedError:
-            # Este es el mensaje que se mostrará cuando tenga mesas asociadas
-            messages.error(request, f'No se puede eliminar a "{usuario.usuario}" porque tiene mesas o registros asociados (está siendo referenciado).')
-            
+            messages.success(request, f'Usuario "{usuario.usuario}" eliminado.')
+        except Exception:
+            messages.error(request, f'No se puede eliminar a "{usuario.usuario}" porque tiene mesas o registros asociados.')
     return redirect('usuarios_lista')
-
 
 @rol_requerido('Administrador')
 def usuario_editar(request, pk):
