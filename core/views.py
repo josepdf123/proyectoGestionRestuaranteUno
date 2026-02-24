@@ -463,17 +463,23 @@ def mesa_pedido(request, pk):
 
 @rol_requerido('Administrador', 'Mesero', 'Cocinero')
 def panel_cocina(request):
-    estado_cocina = Estado.objects.filter(descripcion__iexact='en cocina').first()
-    pedidos = Pedido.objects.filter(idEstado=estado_cocina).prefetch_related('detalles__plato').select_related('idMesa') if estado_cocina else []
+    pedidos = Pedido.objects.filter(idEstado__in=[7, 9]).prefetch_related('detalles__plato').select_related('idMesa')
 
     if request.method == 'POST':
         pedido_id = request.POST.get('pedido_id')
+        accion = request.POST.get('accion')
         pedido = get_object_or_404(Pedido, pk=pedido_id)
-        estado_listo = Estado.objects.filter(descripcion__iexact='listo').first()
-        if estado_listo:
-            pedido.idEstado = estado_listo
-            pedido.save()
-        messages.success(request, f'Pedido de Mesa {pedido.idMesa.numMesa} marcado como listo.')
+        if accion == 'preparando':
+            pedido.idEstado = Estado.objects.get(id=9)
+            messages.success(request, f'Pedido #{pedido.pk} pasado a En Preparación.')
+        elif accion == 'listo':
+            pedido.idEstado = Estado.objects.get(id=8)
+            messages.success(request, f'Pedido #{pedido.pk} marcado como Listo.')
+        elif accion == 'cancelar':
+            pedido.idEstado = Estado.objects.get(id=6)
+            messages.warning(request, f'Pedido #{pedido.pk} cancelado.')
+
+        pedido.save()
         return redirect('panel_cocina')
 
     return render(request, 'core/cocina/panel.html', {'pedidos': pedidos})
@@ -649,5 +655,39 @@ def estadisticas_mesero(request):
         'pedidos_periodo': pedidos_periodo,
         'total_periodo': total_periodo,
         'mesas_periodo': mesas_periodo,
+        'hoy': hoy,
+    })
+    
+    # ─── REPORTE DE PEDIDOS ───────────────────────────────────────────────────────
+
+@rol_requerido('Administrador')
+def reporte_pedidos(request):
+    hoy = now().date()
+
+    # Filtros opcionales
+    fecha_inicio = request.GET.get('fecha_inicio', '')
+    fecha_fin = request.GET.get('fecha_fin', '')
+
+    pedidos = Pedido.objects.filter(
+        idEstado__descripcion__iexact='entregado'
+    ).select_related('idMesa', 'idUsuario', 'idEstado').prefetch_related('detalles__plato')
+
+    if fecha_inicio:
+        pedidos = pedidos.filter(fecha__date__gte=fecha_inicio)
+    if fecha_fin:
+        pedidos = pedidos.filter(fecha__date__lte=fecha_fin)
+
+    pedidos = pedidos.order_by('-fecha')
+
+    # Totales
+    total_general = pedidos.aggregate(total=Sum('total'))['total'] or 0
+    total_pedidos = pedidos.count()
+
+    return render(request, 'core/reporte_pedidos.html', {
+        'pedidos': pedidos,
+        'total_general': total_general,
+        'total_pedidos': total_pedidos,
+        'fecha_inicio': fecha_inicio,
+        'fecha_fin': fecha_fin,
         'hoy': hoy,
     })

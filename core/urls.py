@@ -44,4 +44,6 @@ urlpatterns = [
 
     # Reportes
     path('reportes/', views.reportes, name='reportes'),
+    
+    path('reporte/', views.reporte_pedidos, name='reporte_pedidos'),
 ]

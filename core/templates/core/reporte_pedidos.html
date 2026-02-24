@@ -1,0 +1,125 @@
+{% extends 'core/base.html' %}
+{% block title %}Reporte de Pedidos - Restaurante{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bar-chart-line me-2"></i>Reporte de Pedidos</h2>
+    <span class="text-muted">Hasta: {{ hoy }}</span>
+</div>
+
+<!-- Filtros -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Fecha inicio</label>
+                <input type="date" name="fecha_inicio" class="form-control"
+                       value="{{ fecha_inicio }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-semibold">Fecha fin</label>
+                <input type="date" name="fecha_fin" class="form-control"
+                       value="{{ fecha_fin }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-dark w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+            <div class="col-md-2">
+                <a href="{% url 'reporte_pedidos' %}" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-x-circle me-1"></i> Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tarjetas resumen -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <i class="bi bi-receipt text-primary" style="font-size:2rem;"></i>
+                <h6 class="text-muted mt-2">Total Pedidos</h6>
+                <h3 class="text-primary fw-bold">{{ total_pedidos }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <i class="bi bi-cash-stack text-success" style="font-size:2rem;"></i>
+                <h6 class="text-muted mt-2">Total Vendido</h6>
+                <h3 class="text-success fw-bold">${{ total_general|floatformat:0 }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <i class="bi bi-graph-up text-warning" style="font-size:2rem;"></i>
+                <h6 class="text-muted mt-2">Promedio por Pedido</h6>
+                <h3 class="text-warning fw-bold">
+                    ${% if total_pedidos %}{{ total_general|floatformat:0 }}{% else %}0{% endif %}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de pedidos -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-table me-2"></i>Detalle de Pedidos</h5>
+        <span class="badge bg-secondary">{{ total_pedidos }} pedidos</span>
+    </div>
+    <div class="card-body p-0">
+        {% if pedidos %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Fecha</th>
+                        <th>Mesa</th>
+                        <th>Mesero</th>
+                        <th>Platos</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos %}
+                    <tr>
+                        <td><span class="badge bg-secondary">{{ pedido.pk }}</span></td>
+                        <td>{{ pedido.fecha|date:"d/m/Y H:i" }}</td>
+                        <td><i class="bi bi-grid me-1"></i>Mesa {{ pedido.idMesa.numMesa }}</td>
+                        <td><i class="bi bi-person me-1"></i>{{ pedido.idUsuario.nombre }}</td>
+                        <td>
+                            {% for detalle in pedido.detalles.all %}
+                                <span class="badge bg-light text-dark border me-1">
+                                    {{ detalle.cantidad }}x {{ detalle.plato.nombre }}
+                                </span>
+                            {% endfor %}
+                        </td>
+                        <td class="fw-bold text-success">${{ pedido.total|floatformat:0 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-dark">
+                    <tr>
+                        <td colspan="5" class="text-end fw-bold">Total General:</td>
+                        <td class="fw-bold">${{ total_general|floatformat:0 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox" style="font-size:2.5rem;"></i>
+                <p class="mt-2">No hay pedidos entregados en este período.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
