@@ -33,6 +33,7 @@ urlpatterns = [
     # Mesero
     path('mesero/', views.panel_mesero, name='panel_mesero'),
     path('mesero/mesa/<int:pk>/', views.mesa_pedido, name='mesa_pedido'),
+    path('mesero/estadisticas/', views.estadisticas_mesero, name='estadisticas_mesero'),
 
     # Cocina
     path('cocina/', views.panel_cocina, name='panel_cocina'),

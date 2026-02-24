@@ -7,6 +7,7 @@ from django.conf import settings as django_settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
+from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 from django.utils.timezone import now
 from .forms import MesaForm, PlatoForm, MenuForm, MenuPlatoForm, UsuarioForm, PedidoForm
@@ -601,4 +602,45 @@ def reportes(request):
         'reporte_camareros': reporte_camareros,
         'inicio_semana': inicio_semana,
         'inicio_mes': inicio_mes,
+    })
+# ─── ESTADÍSTICAS MESERO ──────────────────────────────────────────────────────
+
+@rol_requerido('Administrador', 'Mesero')
+def estadisticas_mesero(request):
+    hoy = date.today()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    inicio_mes = hoy.replace(day=1)
+
+    usuario_id = request.session.get('usuario_id')
+    usuario = get_object_or_404(Usuario, pk=usuario_id)
+
+    pedidos_propios = Pedido.objects.filter(
+        idUsuario=usuario,
+        idEstado__descripcion__iexact='entregado'
+    ).select_related('idMesa').prefetch_related('detalles__plato')
+
+    # Período seleccionado
+    periodo = request.GET.get('periodo', 'diario')
+
+    if periodo == 'semanal':
+        pedidos_periodo = pedidos_propios.filter(fecha__date__gte=inicio_semana)
+        label_periodo = f"Semana del {inicio_semana.strftime('%d/%m')} al {hoy.strftime('%d/%m/%Y')}"
+    elif periodo == 'mensual':
+        pedidos_periodo = pedidos_propios.filter(fecha__date__gte=inicio_mes)
+        label_periodo = f"Mes de {hoy.strftime('%B %Y')}"
+    else:
+        pedidos_periodo = pedidos_propios.filter(fecha__date=hoy)
+        label_periodo = f"Hoy {hoy.strftime('%d/%m/%Y')}"
+
+    total_periodo = sum(p.total for p in pedidos_periodo)
+    mesas_periodo = pedidos_periodo.values('idMesa').distinct().count()
+
+    return render(request, 'core/mesero/estadisticas.html', {
+        'usuario': usuario,
+        'periodo': periodo,
+        'label_periodo': label_periodo,
+        'pedidos_periodo': pedidos_periodo,
+        'total_periodo': total_periodo,
+        'mesas_periodo': mesas_periodo,
+        'hoy': hoy,
     })
